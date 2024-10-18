@@ -1,24 +1,31 @@
 #include "Server.h"
+#include "Scheduler.h"
 
 int main() {
+
+    Scheduler scheduler;
+
     Server server("test_server", 1);
 
-    // Simuler la réception de données de capteurs
-    server.receiveData("temperature", "25.3");
-    server.receiveData("humidity", "60%");
-    server.receiveData("temperature", "26.1");
-    server.receiveData("pressure", "1013 hPa");
+    // Utilisation des sous-classes spécifiques
+    HumiditySensor sensor1(1, &server);
+    TemperatureSensor sensor2(2, &server);
+    AirQualitySensor sensor3(3, &server);
+    LightSensor sensor4(4, &server);
+    NoiseLevelSensor sensor5(5, &server);
 
-    // Afficher les données dans la console
-    server.consoleWrite();
+    // Ajouter les capteurs au scheduler avec des intervalles différents
+    scheduler.addSensor(&sensor1, 1);
+    scheduler.addSensor(&sensor2, 2);
+    scheduler.addSensor(&sensor3, 3);
+    scheduler.addSensor(&sensor4, 4);
+    scheduler.addSensor(&sensor5, 5);
 
-    // Écrire les données dans les fichiers de logs
-    server.fileWrite();
+    // Démarrer le scheduler pendant 5 secondes
+    scheduler.start(5);
 
-    // Utiliser l'opérateur << pour afficher les données
+    // Afficher les données
     std::cout << server;
-
-
 
     return 0;
 }

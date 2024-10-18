@@ -4,13 +4,10 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <vector>
-#include <map>
 
 class Server {
     std::string m_name;
     int m_version;
-    std::map<std::string, std::vector<std::string>> m_sensorData;
 
 public:
     Server(std::string name, int version);
@@ -21,13 +18,18 @@ public:
 
     ~Server();
 
-    void receiveData(const std::string& sensorType, const std::string& data);
+    void receiveData(double data, int sensorId, const std::string& sensorType);
 
     void consoleWrite() const;
 
-    void fileWrite() const;
-
     friend std::ostream& operator<<(std::ostream& os, const Server& server);
+
+    void createCSVFiles();
+
+    std::string getCurrentDate();
+
+    std::string getCurrentTime();
+
 };
 
 #endif // SERVER_H
