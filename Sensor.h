@@ -1,86 +1,183 @@
-#include <random>   // Pour std::random_device, std::mt19937, std::uniform_real_distribution
+#include <string>
+#include <iostream>
+#include <iomanip>
+#include <random>
+#include <algorithm>
+#include <map>
+#include <typeinfo>
+#include <type_traits>
 #include "Server.h"
 
-using namespace std;
-
-// Classe de base
+// Interface Sensor with template
+template <typename T>
 class Sensor {
 protected:
-    int m_id;
-    string m_type;
-    double m_data;
-    Server *m_server;
-    double m_lowerBound; // Borne inférieure pour la valeur initiale
-    double m_upperBound; // Borne supérieure pour la valeur initiale
+    int m_id;                     // Sensor identifier
+    std::string m_type;          // Sensor type
+    Server* m_server;            // Associated server
+    T m_data;                    // Sensor data
+    T m_lowerBound;              // Lower limit
+    T m_upperBound;              // Upper limit
 
 public:
-    Sensor(int id, const string& type, Server *server, double lowerBound, double upperBound)
-            : m_id(id), m_type(type), m_server(server),
+    Sensor(int id, const std::string& type, Server* server, T lowerBound, T upperBound)
+            : m_id(id), m_type(type), m_server(server), m_data(T{}),
               m_lowerBound(lowerBound), m_upperBound(upperBound) {}
 
-    virtual ~Sensor() {
-        m_server = nullptr;
-    }
+    virtual ~Sensor() = default;
 
-    // Méthode pour générer et retourner les données du capteur
-    virtual double fetchData() {
-        static bool firstCall = true;
+    // Pure virtual method to update sensor data
+    virtual void update() = 0;
+
+    // Method to get data
+    virtual T getData() const { return m_data; }
+
+    // Accessors for sensor information
+    int getId() const { return m_id; }
+    std::string getType() const { return m_type; }
+};
+
+// Air Quality Sensor with double as data type
+class AirQualitySensor : public Sensor<double> {
+public:
+    AirQualitySensor(int id, Server* server)
+            : Sensor<double>(id, "Air_quality", server, 0.0, 500.0) {}
+
+    void update() override {
         std::random_device rd;
-        std::mt19937 gen(rd());  // Générateur Mersenne Twister
+        std::mt19937 gen(rd());
 
-        if (firstCall) {
-            std::uniform_real_distribution<> dis(m_lowerBound, m_upperBound);
-            m_data = dis(gen);
-            firstCall = false;
-        } else {
-            std::uniform_real_distribution<> dis(0.9, 1.1);  // Variation entre 90% et 110%
-            double variation = dis(gen);
-            m_data *= variation;
+        // Ensure m_data doesn't start at zero or 50
+        if (m_data <= 0 || m_data == 50) {
+            std::uniform_real_distribution<> initial_dis(m_lowerBound + 1, m_upperBound - 1);
+            m_data = initial_dis(gen);
         }
-        return m_data;
-    }
 
-    void sendData() {
-        m_server->receiveData(fetchData(), m_id, m_type);
-    }
-};
+        // Reduced variation to a maximum of 3%
+        std::uniform_real_distribution<> dis(0.97, 1.03);
+        m_data = std::max(m_lowerBound, std::min(m_upperBound, m_data * dis(gen)));
 
-// Sous-classe HumiditySensor
-class HumiditySensor : public Sensor {
-public:
-    HumiditySensor(int id, Server *server)
-            : Sensor(id, "Humidity", server, 10.0, 90.0) { // Borne d'humidité : [10, 90] %
-    }
-};
+        // Random pollution spike
+        if (std::uniform_real_distribution<>(0.0, 1.0)(gen) > 0.98) {
+            m_data = std::max(m_lowerBound, std::min(m_upperBound, m_data + 20.0));
+        }
 
-// Sous-classe TemperatureSensor
-class TemperatureSensor : public Sensor {
-public:
-    TemperatureSensor(int id, Server *server)
-            : Sensor(id, "Temperature", server, -40.0, 85.0) { // Borne de température : [-40, 85] °C
+        if (m_server) {
+            m_server->mesure(this);
+        }
     }
 };
 
-// Sous-classe AirQualitySensor
-class AirQualitySensor : public Sensor {
+// Light Sensor with bool as data type
+// Light Sensor with bool as data type
+class LightSensor : public Sensor<bool> {
 public:
-    AirQualitySensor(int id, Server *server)
-            : Sensor(id, "Air_quality", server, 0.0, 500.0) { // Borne qualité de l'air : [0, 500] AQI
+    LightSensor(int id, Server* server)
+            : Sensor<bool>(id, "Light", server, false, true) {}
+
+    void update() override {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        std::uniform_real_distribution<> dayNightCycle(0.0, 1.0);
+
+        // Generate a random number to determine if we switch the state
+        std::uniform_int_distribution<> chanceDistribution(1, 500);
+        int chance = chanceDistribution(gen);
+
+        // Change state if the random number is 1 (1/500 chance)
+        if (chance == 1) {
+            m_data = !m_data;  // Invert the current state
+        } else {
+            m_data = dayNightCycle(gen) > 0.15;  // Maintain the previous logic
+        }
+
+        if (m_server) {
+            m_server->mesure(this);
+        }
     }
 };
 
-// Sous-classe LightSensor
-class LightSensor : public Sensor {
+
+// Noise Level Sensor with int as data type
+class NoiseLevelSensor : public Sensor<int> {
 public:
-    LightSensor(int id, Server *server)
-            : Sensor(id, "Light", server, 0.0, 100000.0) { // Borne de luminosité : [0, 100000] lux
+    NoiseLevelSensor(int id, Server* server)
+            : Sensor<int>(id, "Noise_level", server, 30, 120) {
+        // Initialiser m_data avec une valeur aléatoire dans les limites
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> initial_dis(m_lowerBound, m_upperBound);
+        m_data = initial_dis(gen);
+    }
+
+    void update() override {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        // Reduced variation to a maximum of 3%
+        std::uniform_real_distribution<> dis(0.97, 1.03);
+        m_data = std::max(m_lowerBound, std::min(m_upperBound, static_cast<int>(m_data * dis(gen))));
+
+        // Random noise spike
+        if (std::uniform_real_distribution<>(0.0, 1.0)(gen) > 0.98) {
+            m_data = std::max(m_lowerBound, std::min(m_upperBound, m_data + 20));
+        }
+
+        if (m_server) {
+            m_server->mesure(this);
+        }
     }
 };
 
-// Sous-classe NoiseLevelSensor
-class NoiseLevelSensor : public Sensor {
+// Temperature Sensor with double as data type
+class TemperatureSensor : public Sensor<double> {
 public:
-    NoiseLevelSensor(int id, Server *server)
-            : Sensor(id, "Noise_level", server, 30.0, 120.0) { // Borne de bruit : [30, 120] dB
+    TemperatureSensor(int id, Server* server)
+            : Sensor<double>(id, "Temperature", server, -40.0, 85.0) {}
+
+    void update() override {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        // Reduced variation to a maximum of 3%
+        std::uniform_real_distribution<> dis(0.97, 1.03);
+        m_data = std::max(m_lowerBound, std::min(m_upperBound, m_data * dis(gen)));
+
+        if (m_server) {
+            m_server->mesure(this);
+        }
+    }
+};
+
+// Humidity Sensor with int as data type
+class HumiditySensor : public Sensor<int> {
+public:
+    HumiditySensor(int id, Server* server)
+            : Sensor<int>(id, "Humidity", server, 10, 90) {
+        // Initialiser m_data avec une valeur aléatoire dans les limites
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> initial_dis(m_lowerBound, m_upperBound);
+        m_data = initial_dis(gen);
+    }
+
+    void update() override {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        // Generate a change percentage between -2% and +1%
+        std::uniform_real_distribution<> dis(-0.02, 0.01);
+        double changePercentage = dis(gen); // Get a random change percentage
+
+        // Apply the change percentage to the current humidity value
+        m_data = static_cast<int>(m_data * (1 + changePercentage));
+
+        // Ensure the new humidity value is within the defined bounds
+        m_data = std::max(m_lowerBound, std::min(m_upperBound, m_data));
+
+        if (m_server) {
+            m_server->mesure(this);
+        }
     }
 };
