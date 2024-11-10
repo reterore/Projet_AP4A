@@ -47,6 +47,9 @@ public:
     template <typename T>
     void fileWrite(const Sensor<T>* sensor);
 
+    template <typename T>
+    void checkThreshold(const Sensor<T>* sensor, double threshold);
+
     // Surcharge de l'opérateur << pour l'affichage
     friend std::ostream& operator<<(std::ostream& os, const Server& server);
 };
@@ -97,5 +100,17 @@ void Server::fileWrite(const Sensor<T>* sensor) {
     std::cout << "Sensor's data for " << sensor->getType()
               << " has been written to the file " << it->second << std::endl;
 }
+
+template <typename T>
+void Server::checkThreshold(const Sensor<T>* sensor, double threshold) {
+    double data = sensor->getData();
+    if (data > threshold) {
+        std::cout << "Alert! Sensor ID: " << sensor->getId()
+                  << " of type " << sensor->getType()
+                  << " has exceeded the threshold with a value of " << data
+                  << std::endl;
+    }
+}
+
 
 #endif // SERVER_H

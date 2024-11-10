@@ -2,6 +2,8 @@
 #include <iostream>
 #include <map>
 #include <iomanip>
+#include <filesystem>
+#include <fstream>
 
 namespace fs = std::filesystem;
 
@@ -10,7 +12,7 @@ Server::Server(std::string name, int version) : m_name(std::move(name)), m_versi
     createCSVFiles();  // Crée les fichiers lors de l'initialisation du serveur
 }
 
-Server::Server(Server& other){
+Server::Server(Server& other) {
     m_name = other.m_name;
     m_version = other.m_version;
     createCSVFiles();
@@ -38,27 +40,28 @@ void Server::createCSVFiles() {
             {"Noise_level", dirName + "/noise_level_log.csv"}
     };
 
-    // Créer les fichiers et écrire les en-têtes pour chaque capteur
+    // Créer les fichiers uniquement si aucun fichier n'existe et écrire les en-têtes
     for (const auto& file : sensorFiles) {
-        std::ofstream ofs(file.second, std::ios::app);
-        if (!ofs) {
-            std::cerr << "Failed to create or open file: " << file.second << std::endl;
-        } else {
-            // Écrire les en-têtes spécifiques pour chaque type de capteur
-            if (file.first == "Temperature") {
-                ofs << "Date;Heure;Sensor ID;Data (°C)" << std::endl;  // En-tête pour Temperature
-            } else if (file.first == "Humidity") {
-                ofs << "Date;Heure;Sensor ID;Data (%)" << std::endl;   // En-tête pour Humidity
-            } else if (file.first == "Air_quality") {
-                ofs << "Date;Heure;Sensor ID;Data (PPM)" << std::endl; // En-tête pour Air Quality
-            } else if (file.first == "Light") {
-                ofs << "Date;Heure;Sensor ID;Data (lux)" << std::endl;  // En-tête pour Light
-            } else if (file.first == "Noise_level") {
-                ofs << "Date;Heure;Sensor ID;Data (dB)" << std::endl;   // En-tête pour Noise Level
+        if (!fs::exists(file.second)) {  // Vérifie si le fichier n'existe pas
+            std::ofstream ofs(file.second, std::ios::app);
+            if (!ofs) {
+                std::cerr << "Failed to create or open file: " << file.second << std::endl;
+            } else {
+                // Écrire les en-têtes spécifiques pour chaque type de capteur
+                if (file.first == "Temperature") {
+                    ofs << "Date;Heure;Sensor ID;Data (°C)" << std::endl;  // En-tête pour Temperature
+                } else if (file.first == "Humidity") {
+                    ofs << "Date;Heure;Sensor ID;Data (%)" << std::endl;   // En-tête pour Humidity
+                } else if (file.first == "Air_quality") {
+                    ofs << "Date;Heure;Sensor ID;Data (PPM)" << std::endl; // En-tête pour Air Quality
+                } else if (file.first == "Light") {
+                    ofs << "Date;Heure;Sensor ID;Data (lux)" << std::endl;  // En-tête pour Light
+                } else if (file.first == "Noise_level") {
+                    ofs << "Date;Heure;Sensor ID;Data (dB)" << std::endl;   // En-tête pour Noise Level
+                }
             }
         }
     }
-
 }
 
 // Méthodes pour obtenir la date et l'heure actuelles
